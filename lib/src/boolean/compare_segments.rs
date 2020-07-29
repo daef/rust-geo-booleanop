@@ -86,7 +86,7 @@ where
         }
 
         // Segments are collinear
-        if se_old_l.is_subject == se_new_l.is_subject {
+        if se_old_l.contour_id == se_new_l.contour_id {
             if se_old_l.point == se_new_l.point {
                 // Previously this was returning Ordering::Equal if the segments had identical
                 // left and right endpoints. I think in order to properly support self-overlapping
@@ -99,7 +99,7 @@ where
                 less_if(true)
             }
         } else {
-            less_if(se_old_l.is_subject)
+            less_if(se_old_l.contour_id < se_new_l.contour_id)
         }
     } else {
         debug_assert!(false, "Other events should always be defined in compare_segment.");
