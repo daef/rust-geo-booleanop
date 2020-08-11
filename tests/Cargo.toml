@@ -18,6 +18,7 @@ num-traits = "0.2"
 glob = "0.3"
 pretty_assertions = "0.6"
 rand = "0.7.3"
+array_stump = { git = "https://github.com/daef/rust-array-stump", rev = "d2ca89804d0d7026484a461b16280b2cc503d4d7" }
 
 [dev-dependencies]
 criterion = "0.3"

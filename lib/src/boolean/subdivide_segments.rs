@@ -4,7 +4,7 @@ use super::helper::{BoundingBox, Float};
 use super::possible_intersection::possible_intersection;
 use super::sweep_event::SweepEvent;
 use super::Operation;
-use crate::splay::SplaySet;
+use array_stump::ArrayStump;
 use std::collections::BinaryHeap;
 use std::rc::Rc;
 
@@ -20,13 +20,14 @@ pub fn subdivide<F>(
 where
     F: Float,
 {
-    let mut sweep_line = SplaySet::<Rc<SweepEvent<F>>, _>::new(compare_segments);
+    let mut sweep_line = ArrayStump::<Rc<SweepEvent<F>>, _>::new(compare_segments);
     let mut sorted_events: Vec<Rc<SweepEvent<F>>> = Vec::new();
     let rightbound = sbbox.max.x.min(cbbox.max.x);
 
     while let Some(event) = event_queue.pop() {
         #[cfg(feature = "debug-booleanop")]
         {
+            sweep_line.debug_order();
             println!("\n{{\"processEvent\": {}}}", event.to_json_debug());
         }
         sorted_events.push(event.clone());
@@ -38,10 +39,16 @@ where
         }
 
         if event.is_left() {
-            sweep_line.insert(event.clone());
+            let insert_pos = sweep_line.insert(event.clone());
+            let insert_pos = match insert_pos {
+                Some(insert_pos) => insert_pos,
+                None => break
+            };
 
-            let maybe_prev = sweep_line.prev(&event);
-            let maybe_next = sweep_line.next(&event);
+            let index_prev = sweep_line.prev_index(insert_pos);
+            let index_next = sweep_line.next_index(insert_pos);
+            let maybe_prev = index_prev.map(|idx| sweep_line.get_by_index(idx));
+            let maybe_next = index_next.map(|idx| sweep_line.get_by_index(idx));
 
             compute_fields(&event, maybe_prev, operation);
 
@@ -63,22 +70,26 @@ where
                     println!("{{\"sePrevEvent\": {}}}", prev.to_json_debug());
                 }
                 if possible_intersection(&prev, &event, event_queue) == 2 {
-                    let maybe_prev_prev = sweep_line.prev(&prev);
+                    let maybe_prev_prev = index_prev
+                        .and_then(|idx| sweep_line.prev_index(idx))
+                        .map(|idx| sweep_line.get_by_index(idx));
                     // Recompute fields for current segment and the one below (in bottom to top order)
                     compute_fields(&prev, maybe_prev_prev, operation);
                     compute_fields(&event, Some(prev), operation);
                 }
             }
+
+            sweep_line.fix_rank_range(
+                index_prev.unwrap_or(insert_pos),
+                index_next.unwrap_or(insert_pos));
+
         } else if let Some(other_event) = event.get_other_event() {
-            // This debug assert is only true, if we compare segments in the sweep line
-            // based on identity (curently), and not by value (done previously).
-            debug_assert!(
-                sweep_line.contains(&other_event),
-                "Sweep line misses event to be removed"
-            );
-            if sweep_line.contains(&other_event) {
-                let maybe_prev = sweep_line.prev(&other_event).cloned();
-                let maybe_next = sweep_line.next(&other_event).cloned();
+            let index_existing = sweep_line.find(&other_event);
+            if let Some(index_existing) = index_existing {
+                let index_prev = sweep_line.prev_index(index_existing);
+                let index_next = sweep_line.next_index(index_existing);
+                let maybe_prev = index_prev.map(|idx| sweep_line.get_by_index(idx));
+                let maybe_next = index_next.map(|idx| sweep_line.get_by_index(idx));
 
                 if let (Some(prev), Some(next)) = (maybe_prev, maybe_next) {
                     #[cfg(feature = "debug-booleanop")]
@@ -94,7 +105,14 @@ where
                 {
                     println!("{{\"removing\": {}}}", other_event.to_json_debug());
                 }
-                sweep_line.remove(&other_event);
+                sweep_line.remove_by_index(index_existing);
+            } else {
+                // This debug assert is only true, if we compare segments in the sweep line
+                // based on identity (currently), and not by value (done previously).
+                debug_assert!(
+                    false,
+                    "Sweep line misses event to be removed"
+                );
             }
         }
     }
