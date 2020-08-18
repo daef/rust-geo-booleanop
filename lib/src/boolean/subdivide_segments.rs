@@ -99,6 +99,7 @@ where
                         println!("{{\"sePostPrevEvent\": {}}}", prev.to_json_debug());
                     }
                     possible_intersection(&prev, &next, event_queue);
+                    sweep_line.fix_rank_range(index_prev.unwrap(), index_next.unwrap());
                 }
 
                 #[cfg(feature = "debug-booleanop")]
