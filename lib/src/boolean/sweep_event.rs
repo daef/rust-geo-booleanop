@@ -250,7 +250,7 @@ where
             }
         }
 
-        less_if(!self.is_subject && other.is_subject)
+        less_if(!self.contour_id < other.contour_id)
     }
 }
 

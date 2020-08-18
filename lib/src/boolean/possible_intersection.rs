@@ -54,7 +54,7 @@ where
             }
             1
         }
-        LineIntersection::Overlap(_, _) if se1.is_subject == se2.is_subject => 0, // The line segments associated to se1 and se2 overlap
+        LineIntersection::Overlap(_, _) if se1.contour_id == se2.contour_id => 0, // The line segments associated to se1 and se2 overlap
         LineIntersection::Overlap(_, _) => {
             let mut events = Vec::new();
             let mut left_coincide = false;

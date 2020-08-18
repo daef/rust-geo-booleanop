@@ -8,7 +8,7 @@ where
     F: Float,
 {
     if let Some(prev) = maybe_prev {
-        if event.is_subject == prev.is_subject {
+        if event.contour_id == prev.contour_id {
             event.set_in_out(!prev.is_in_out(), prev.is_other_in_out());
         } else if prev.is_vertical() {
             event.set_in_out(!prev.is_other_in_out(), !prev.is_in_out());
