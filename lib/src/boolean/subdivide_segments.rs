@@ -52,12 +52,15 @@ where
 
             compute_fields(&event, maybe_prev, operation);
 
+            let mut mutation_sum = 0;
             if let Some(next) = maybe_next {
                 #[cfg(feature = "debug-booleanop")]
                 {
                     println!("{{\"seNextEvent\": {}}}", next.to_json_debug());
                 }
-                if possible_intersection(&event, &next, event_queue) == 2 {
+                let mutations = possible_intersection(&event, &next, event_queue);
+                mutation_sum += mutations;
+                if mutations == 2 {
                     // Recompute fields for current segment and the one above (in bottom to top order)
                     compute_fields(&event, maybe_prev, operation);
                     compute_fields(&next, Some(&event), operation);
@@ -69,7 +72,9 @@ where
                 {
                     println!("{{\"sePrevEvent\": {}}}", prev.to_json_debug());
                 }
-                if possible_intersection(&prev, &event, event_queue) == 2 {
+                let mutations = possible_intersection(&prev, &event, event_queue);
+                mutation_sum += mutations;
+                if mutations == 2 {
                     let maybe_prev_prev = index_prev
                         .and_then(|idx| sweep_line.prev_index(idx))
                         .map(|idx| sweep_line.get_by_index(idx));
@@ -79,10 +84,9 @@ where
                 }
             }
 
-            sweep_line.fix_rank_range(
-                index_prev.unwrap_or(insert_pos),
-                index_next.unwrap_or(insert_pos));
-
+            if mutation_sum > 0 {
+                sweep_line.fix_rank_range(index_prev.unwrap_or(insert_pos), index_next.unwrap_or(insert_pos));
+            }
         } else if let Some(other_event) = event.get_other_event() {
             let index_existing = sweep_line.find(&other_event);
             if let Some(index_existing) = index_existing {
@@ -98,8 +102,9 @@ where
                         println!("{{\"sePostNextEvent\": {}}}", next.to_json_debug());
                         println!("{{\"sePostPrevEvent\": {}}}", prev.to_json_debug());
                     }
-                    possible_intersection(&prev, &next, event_queue);
-                    sweep_line.fix_rank_range(index_prev.unwrap(), index_next.unwrap());
+                    if possible_intersection(&prev, &next, event_queue) > 0 {
+                        sweep_line.fix_rank_range(index_prev.unwrap(), index_next.unwrap());
+                    }
                 }
 
                 #[cfg(feature = "debug-booleanop")]
