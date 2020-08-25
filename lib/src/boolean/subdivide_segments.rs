@@ -5,8 +5,9 @@ use super::possible_intersection::possible_intersection;
 use super::sweep_event::SweepEvent;
 use super::Operation;
 use array_stump::ArrayStump;
-use std::collections::BinaryHeap;
+use std::collections::{HashSet, BinaryHeap};
 use std::rc::Rc;
+use by_address::ByAddress;
 
 #[cfg(feature = "debug-booleanop")]
 use super::sweep_event::JsonDebug;
@@ -23,6 +24,7 @@ where
     let mut sweep_line = ArrayStump::<Rc<SweepEvent<F>>, _>::new(compare_segments);
     let mut sorted_events: Vec<Rc<SweepEvent<F>>> = Vec::new();
     let rightbound = sbbox.max.x.min(cbbox.max.x);
+    let mut to_skip = HashSet::new();
 
     while let Some(event) = event_queue.pop() {
         #[cfg(feature = "debug-booleanop")]
@@ -42,7 +44,14 @@ where
             let insert_pos = sweep_line.insert(event.clone());
             let insert_pos = match insert_pos {
                 Some(insert_pos) => insert_pos,
-                None => break
+                None => {
+                    #[cfg(feature = "debug-booleanop")]
+                    {
+                        println!("{{\"skipping\"}}");
+                    }
+                    to_skip.insert(ByAddress(event.get_other_event().unwrap()));
+                    continue; // ignore events that are equal (already exist on sweep_line)
+                }
             };
 
             let index_prev = sweep_line.prev_index(insert_pos);
@@ -85,9 +94,16 @@ where
             }
 
             if mutation_sum > 0 {
-                sweep_line.fix_rank_range(index_prev.unwrap_or(insert_pos), index_next.unwrap_or(insert_pos));
+                let _transition = sweep_line.fix_rank_range(index_prev.unwrap_or(insert_pos), index_next.unwrap_or(insert_pos));
             }
         } else if let Some(other_event) = event.get_other_event() {
+            if to_skip.contains(&ByAddress(event.clone())) {
+                #[cfg(feature = "debug-booleanop")]
+                {
+                    println!("{{\"skipped\"}}");
+                }
+                continue;
+            }
             let index_existing = sweep_line.find(&other_event);
             if let Some(index_existing) = index_existing {
                 let index_prev = sweep_line.prev_index(index_existing);
